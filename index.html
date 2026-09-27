@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Escape Room - Interactive Edition</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
+            overflow-x: hidden;
+            user-select: none;
+        }
+        
+        .term-font {
+            font-family: 'Space Mono', monospace;
+        }
+
+        .neon-glow-blue {
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4), inset 0 0 15px rgba(56, 189, 248, 0.2);
+        }
+
+        .neon-glow-green {
+            box-shadow: 0 0 15px rgba(52, 211, 153, 0.4), inset 0 0 15px rgba(52, 211, 153, 0.2);
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(51, 65, 85, 0.6);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7);
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0) }
+            20% { transform: translate(-3px, 3px) }
+            40% { transform: translate(-3px, -3px) }
+            60% { transform: translate(3px, 3px) }
+            80% { transform: translate(3px, -3px) }
+            100% { transform: translate(0) }
+        }
+
+        .glitch-anim {
+            animation: glitch 0.35s cubic-bezier(.25, .46, .45, .94) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(3px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+            40%, 60% { transform: translate3d(5px, 0, 0); }
+        }
+
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes rotateGear {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .gear-rotate {
+            animation: rotateGear 1.2s ease-in-out;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155; 
+            border-radius: 4px;
+        }
+
+        .mode-card {
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .mode-card:hover {
+            transform: translateY(-4px);
+        }
+        .mode-card.selected {
+            border-color: #3b82f6;
+            background: rgba(30, 58, 138, 0.45);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-pushable {
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.4);
+        }
+        .btn-pushable:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 rgba(0,0,0,0.4);
+        }
+
+        /* Canvas overlay for interactive scratchpad */
+        #scratchpad-canvas {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen w-screen flex flex-col justify-center items-center p-2 sm:p-4 relative">
+
+    <canvas id="bg-particles-canvas" class="fixed inset-0 z-0 pointer-events-none w-full h-full"></canvas>
+
+    <div id="game-container" class="glass-panel w-full max-w-4xl h-[95vh] sm:h-[90vh] rounded-2xl flex flex-col relative z-10 overflow-hidden border border-slate-700/80">
+        
+        <header id="game-header" class="border-b border-slate-700/80 p-3 sm:p-4 flex flex-wrap justify-between items-center bg-slate-900/90 gap-2">
+            
+            <div class="flex items-center gap-3">
+                <div id="vault-dial-icon" class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-800 border border-blue-500/50 flex items-center justify-center shadow-[0_0_10px_rgba(59,130,246,0.3)]">
+                    <i class="fa-solid fa-vault text-blue-400 text-lg sm:text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xs sm:text-base font-extrabold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400 leading-none">
+                        NISBAH KEWANGAN ESCAPE
+                    </h1>
+                    <span id="player-tag" class="text-[10px] sm:text-xs text-slate-400 font-mono hidden">Ejen: <span id="hud-player-name" class="text-emerald-400 font-bold">-</span></span>
+                </div>
+            </div>
+            
+            <!-- Level Progress Dots -->
+            <div id="progress-dots" class="hidden flex flex-wrap gap-1 max-w-[240px] sm:max-w-none justify-center">
+                <!-- 20 Level dots generated dynamically -->
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Streak Badge -->
+                <div id="streak-badge" class="hidden px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] sm:text-xs font-bold items-center gap-1">
+                    <i class="fa-solid fa-fire text-amber-400 animate-bounce"></i> <span id="streak-count">0</span>x
+                </div>
+
+                <!-- Sound Toggle -->
+                <button onclick="toggleAudio()" id="audio-toggle-btn" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 flex items-center justify-center text-slate-300 text-xs transition-all" title="Buka/Tutup Bunyi">
+                    <i id="audio-icon" class="fa-solid fa-volume-high text-emerald-400"></i>
+                </button>
+
+                <!-- Tools Menu Toggle (Calculator / Scratchpad) -->
+                <button onclick="toggleCalculatorModal()" class="w-8 h-8 rounded-lg bg-indigo-900/60 hover:bg-indigo-800 border border-indigo-500/50 flex items-center justify-center text-indigo-300 text-xs transition-all shadow-md" title="Kalkulator & Rumus">
+                    <i class="fa-solid fa-calculator"></i>
+                </button>
+
+                <button onclick="toggleScratchpadModal()" class="w-8 h-8 rounded-lg bg-purple-900/60 hover:bg-purple-800 border border-purple-500/50 flex items-center justify-center text-purple-300 text-xs transition-all shadow-md" title="Pad Lakar / Graf">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+
+                <!-- Timer & Level Displays -->
+                <div class="text-right border-l border-slate-700 pl-2 sm:pl-3">
+                    <p class="text-[9px] text-slate-400 uppercase tracking-widest">Level</p>
+                    <p id="level-display" class="font-bold text-blue-400 term-font text-xs sm:text-sm">0/20</p>
+                </div>
+                <div class="text-right border-l border-slate-700 pl-2 sm:pl-3">
+                    <p class="text-[9px] text-slate-400 uppercase tracking-widest">Masa</p>
+                    <p id="timer-display" class="font-bold text-red-400 term-font text-xs sm:text-sm">00:00</p>
+                </div>
+            </div>
+        </header>
+
+        <main id="content-area" class="flex-grow p-3 sm:p-6 flex flex-col justify-center relative overflow-y-auto">
+            
+            <div id="room-0" class="room-content text-center space-y-4 max-w-2xl mx-auto my-auto w-full">
+                <div>
+                    <div class="inline-flex items-center justify-center p-3 bg-blue-500/10 rounded-2xl border border-blue-500/30 mb-2">
+                        <i class="fa-solid fa-shield-halved text-3xl sm:text-5xl text-blue-400"></i>
+                    </div>
+                    <h2 class="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-200 to-purple-400">
+                        PERNIAGAAN BAB 6 : ESCAPE ROOM
+                    </h2>
+                    <p class="text-slate-300 text-xs sm:text-sm mt-1">
+                        Selesaikan 20 Cabaran Penyata Kewangan (10 Teori + 10 Pengiraan).
+                    </p>
+                </div>
+
+                <!-- Player Name Input -->
+                <div class="bg-slate-900/90 p-3 sm:p-4 rounded-xl border border-slate-700/80 text-left space-y-1.5 shadow-inner">
+                    <label for="player-name-input" class="block text-xs font-bold uppercase text-slate-300 tracking-wider">
+                        <i class="fa-solid fa-id-card text-blue-400 mr-2"></i>Nama Ejen / Pelajar:
+                    </label>
+                    <input type="text" id="player-name-input" maxlength="25" placeholder="Masukkan nama anda..." 
+                        class="w-full bg-slate-800/90 border border-slate-600 rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500 font-semibold term-font text-xs sm:text-sm">
+                </div>
+
+                <!-- Mode Cards -->
+                <div class="space-y-1.5 text-left">
+                    <label class="block text-xs font-bold uppercase text-slate-300 tracking-wider">
+                        <i class="fa-solid fa-sliders text-purple-400 mr-2"></i>Pilih Mod Cabaran:
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        <div id="card-troopers" onclick="selectMode('troopers')" class="mode-card glass-panel p-3 rounded-xl border border-slate-700 cursor-pointer">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-emerald-400 text-xs sm:text-sm">Troopers</span>
+                                <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">Mudah</span>
+                            </div>
+                            <p class="text-[11px] text-slate-300 mb-1.5">Untuk Ulangan Asas.</p>
+                            <ul class="text-[10px] text-slate-400 space-y-0.5 term-font">
+                                <li><i class="fa-regular fa-clock text-emerald-400 mr-1"></i> Masa: 20 Minit</li>
+                                <li><i class="fa-solid fa-triangle-exclamation text-emerald-400 mr-1"></i> Penalti: -5s</li>
+                            </ul>
+                        </div>
+
+                        <div id="card-rascals" onclick="selectMode('rascals')" class="mode-card glass-panel p-3 rounded-xl border border-slate-700 cursor-pointer selected">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-blue-400 text-xs sm:text-sm">Rascals</span>
+                                <span class="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold">Standard</span>
+                            </div>
+                            <p class="text-[11px] text-slate-300 mb-1.5">Standard SPM / Matrikulasi.</p>
+                            <ul class="text-[10px] text-slate-400 space-y-0.5 term-font">
+                                <li><i class="fa-regular fa-clock text-blue-400 mr-1"></i> Masa: 12 Minit</li>
+                                <li><i class="fa-solid fa-triangle-exclamation text-blue-400 mr-1"></i> Penalti: -15s</li>
+                            </ul>
+                        </div>
+
+                        <div id="card-tricksters" onclick="selectMode('tricksters')" class="mode-card glass-panel p-3 rounded-xl border border-slate-700 cursor-pointer">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-purple-400 text-xs sm:text-sm">Tricksters</span>
+                                <span class="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold">Pakar</span>
+                            </div>
+                            <p class="text-[11px] text-slate-300 mb-1.5">Kepantasan Maksimum.</p>
+                            <ul class="text-[10px] text-slate-400 space-y-0.5 term-font">
+                                <li><i class="fa-regular fa-clock text-purple-400 mr-1"></i> Masa: 7 Minit</li>
+                                <li><i class="fa-solid fa-triangle-exclamation text-purple-400 mr-1"></i> Penalti: -30s</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="startGame()" class="btn-pushable w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 px-8 rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all uppercase tracking-wider text-xs sm:text-sm">
+                    Mula Cabaran Sekarang <i class="fa-solid fa-play ml-2"></i>
+                </button>
+            </div>
+
+            <div id="active-room-container" class="room-content hidden flex flex-col h-full justify-between max-w-2xl mx-auto w-full">
+                <div>
+                    <!-- Header Badges -->
+                    <div class="flex justify-between items-center mb-2 border-b border-slate-700/80 pb-2">
+                        <span id="room-category-badge" class="px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wider bg-indigo-900/60 text-indigo-300 border border-indigo-700/80">
+                            Bahagian A: Teori
+                        </span>
+                        
+                        <!-- Interactive Power-up Lifeline Buttons -->
+                        <div class="flex items-center gap-1.5">
+                            <button id="powerup-5050" onclick="usePowerup('5050')" class="px-2 py-1 bg-amber-900/50 hover:bg-amber-800 border border-amber-500/50 rounded text-[10px] font-bold text-amber-300 transition-all flex items-center gap-1" title="Padam 2 Jawapan Salah">
+                                ⚡ <span>50:50</span> (<span id="count-5050">1</span>)
+                            </button>
+                            <button id="powerup-freeze" onclick="usePowerup('freeze')" class="px-2 py-1 bg-cyan-900/50 hover:bg-cyan-800 border border-cyan-500/50 rounded text-[10px] font-bold text-cyan-300 transition-all flex items-center gap-1" title="Bekukan Masa +15 Saat">
+                                ⏱️ <span>+15s</span> (<span id="count-freeze">1</span>)
+                            </button>
+                        </div>
+                    </div>
+
+                    <h2 id="room-header-title" class="text-base sm:text-xl font-bold text-blue-400 mb-1">
+                        Tujuan Nisbah Kecairan
+                    </h2>
+
+                    <!-- Question Container -->
+                    <div class="bg-slate-900/90 rounded-xl p-3.5 sm:p-5 border border-slate-700 shadow-inner my-2">
+                        <p id="room-question-text" class="text-xs sm:text-base font-semibold text-white mb-3 leading-relaxed">
+                            1. Apakah tujuan utama Nisbah Semasa dan Nisbah Cepat dalam analisis kewangan?
+                        </p>
+
+                        <!-- Options Grid -->
+                        <div id="room-options-container" class="space-y-2">
+                            <!-- Rendered dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hint Drawer Box -->
+                <div id="room-hint-box" class="mt-2 bg-blue-950/40 p-2.5 sm:p-3 rounded-lg border border-blue-800/80 text-xs text-blue-200 flex items-start gap-2">
+                    <i class="fa-solid fa-lightbulb text-amber-400 text-sm mt-0.5"></i>
+                    <div>
+                        <strong class="text-amber-300 font-bold block text-[11px] uppercase tracking-wider">Petunjuk Bantuan:</strong>
+                        <span id="room-hint-text">Hint text loading...</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="room-success" class="room-content hidden text-center space-y-3 my-auto max-w-2xl mx-auto w-full">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 text-3xl shadow-[0_0_20px_rgba(52,211,153,0.5)] animate-bounce">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+                
+                <h2 class="text-2xl sm:text-4xl font-extrabold text-emerald-400">MISI BERJAYA!</h2>
+                <p class="text-slate-300 text-xs sm:text-sm">
+                    Tahniah Ejen <span id="res-player-name" class="font-bold text-emerald-300"></span>! Semua 20 Kunci Nisbah Kewangan Berjaya Dibuka!
+                </p>
+                
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
+                    <div class="bg-slate-800/80 p-2 sm:p-2.5 rounded-lg border border-slate-700">
+                        <p class="text-[9px] text-slate-400 uppercase">Gred Prestasi</p>
+                        <p id="res-grade" class="text-base sm:text-lg font-bold text-amber-400 term-font">S</p>
+                    </div>
+                    <div class="bg-slate-800/80 p-2 sm:p-2.5 rounded-lg border border-slate-700">
+                        <p class="text-[9px] text-slate-400 uppercase">Skor Mata</p>
+                        <p id="res-score" class="text-base sm:text-lg font-bold text-blue-400 term-font">0</p>
+                    </div>
+                    <div class="bg-slate-800/80 p-2 sm:p-2.5 rounded-lg border border-slate-700">
+                        <p class="text-[9px] text-slate-400 uppercase">Masa Digunakan</p>
+                        <p id="res-time-taken" class="text-xs sm:text-sm font-bold text-emerald-400 term-font">00:00</p>
+                    </div>
+                    <div class="bg-slate-800/80 p-2 sm:p-2.5 rounded-lg border border-slate-700">
+                        <p class="text-[9px] text-slate-400 uppercase">Penalti Kesalahan</p>
+                        <p id="res-penalties" class="text-xs sm:text-sm font-bold text-red-400 term-font">0 kali</p>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 justify-center pt-2">
+                    <button onclick="toggleReviewModal()" class="btn-pushable bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-5 rounded-lg text-xs sm:text-sm">
+                        <i class="fa-solid fa-list-check mr-1.5"></i> Semak Jawapan & Rumus
+                    </button>
+                    <button onclick="location.reload()" class="btn-pushable bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-5 rounded-lg text-xs sm:text-sm">
+                        <i class="fa-solid fa-rotate-right mr-1.5"></i> Main Semula
+                    </button>
+                </div>
+            </div>
+
+            <div id="room-fail" class="room-content hidden text-center space-y-4 my-auto max-w-2xl mx-auto w-full">
+                <i class="fa-solid fa-skull-crossbones text-5xl text-red-500 shake"></i>
+                <h2 class="text-2xl sm:text-4xl font-extrabold text-red-500">MASA TAMAT!</h2>
+                <p class="text-slate-300 text-xs sm:text-sm">
+                    Ejen <span id="fail-player-name" class="font-bold text-red-400"></span> terperangkap. Bilik kebal dikunci secara automatik.
+                </p>
+                
+                <div class="flex flex-wrap gap-2 justify-center">
+                    <button onclick="toggleReviewModal()" class="btn-pushable bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-6 rounded-lg text-xs sm:text-sm">
+                        <i class="fa-solid fa-book-open mr-1.5"></i> Semak Nota & Soalan
+                    </button>
+                    <button onclick="location.reload()" class="btn-pushable bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 px-6 rounded-lg text-xs sm:text-sm">
+                        <i class="fa-solid fa-rotate-right mr-1.5"></i> Cuba Lagi
+                    </button>
+                </div>
+            </div>
+
+        </main>
+        
+        <div id="message-box" class="absolute top-16 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-xl border transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2 text-xs sm:text-sm font-bold">
+            <i id="msg-icon" class="fa-solid fa-circle-info"></i>
+            <span id="message-text">Notification</span>
+        </div>
+    </div>
+
+    <div id="calc-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-3">
+        <div class="glass-panel w-full max-w-md rounded-2xl p-4 border border-slate-700 space-y-3 relative">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <div class="flex items-center gap-2 text-blue-400 font-bold text-sm">
+                    <i class="fa-solid fa-calculator"></i> Kalkulator & Formula Kewangan
+                </div>
+                <button onclick="toggleCalculatorModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex border-b border-slate-700 text-xs font-bold">
+                <button onclick="switchCalcTab('calc')" id="btn-tab-calc" class="flex-1 py-1.5 text-center text-blue-400 border-b-2 border-blue-400">Kalkulator</button>
+                <button onclick="switchCalcTab('formulas')" id="btn-tab-formulas" class="flex-1 py-1.5 text-center text-slate-400 border-b-2 border-transparent">Formula Sheet</button>
+            </div>
+
+            <!-- Tab 1: Calculator -->
+            <div id="tab-calc-content" class="space-y-2">
+                <input type="text" id="calc-display" readonly value="0" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-right font-mono text-xl text-emerald-400 font-bold focus:outline-none">
+                <div class="grid grid-cols-4 gap-1.5 text-sm term-font">
+                    <button onclick="calcClear()" class="p-2.5 bg-red-900/60 hover:bg-red-800 rounded font-bold text-red-200">C</button>
+                    <button onclick="calcPress('/')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold text-blue-400">÷</button>
+                    <button onclick="calcPress('*')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold text-blue-400">×</button>
+                    <button onclick="calcBackspace()" class="p-2.5 bg-amber-900/60 hover:bg-amber-800 rounded font-bold text-amber-200"><i class="fa-solid fa-backspace"></i></button>
+                    
+                    <button onclick="calcPress('7')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">7</button>
+                    <button onclick="calcPress('8')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">8</button>
+                    <button onclick="calcPress('9')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">9</button>
+                    <button onclick="calcPress('-')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold text-blue-400">-</button>
+                    
+                    <button onclick="calcPress('4')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">4</button>
+                    <button onclick="calcPress('5')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">5</button>
+                    <button onclick="calcPress('6')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">6</button>
+                    <button onclick="calcPress('+')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold text-blue-400">+</button>
+                    
+                    <button onclick="calcPress('1')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">1</button>
+                    <button onclick="calcPress('2')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">2</button>
+                    <button onclick="calcPress('3')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">3</button>
+                    <button onclick="calcEqual()" class="row-span-2 p-2.5 bg-blue-600 hover:bg-blue-500 rounded font-bold text-white flex items-center justify-center">=</button>
+                    
+                    <button onclick="calcPress('0')" class="col-span-2 p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">0</button>
+                    <button onclick="calcPress('.')" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded font-bold">.</button>
+                </div>
+            </div>
+
+            <!-- Tab 2: Formula Reference Sheet -->
+            <div id="tab-formulas-content" class="hidden max-h-64 overflow-y-auto space-y-2 pr-1 text-xs">
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                    <p class="font-bold text-blue-400">Nisbah Semasa:</p>
+                    <p class="text-slate-300 term-font">Aset Semasa ÷ Liabiliti Semasa</p>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                    <p class="font-bold text-blue-400">Nisbah Cepat:</p>
+                    <p class="text-slate-300 term-font">(Aset Semasa - Inventori) ÷ Liabiliti Semasa</p>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                    <p class="font-bold text-blue-400">Margin Untung Bersih:</p>
+                    <p class="text-slate-300 term-font">(Untung Bersih ÷ Jualan) × 100%</p>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                    <p class="font-bold text-blue-400">ROE (Pulangan Ekuiti):</p>
+                    <p class="text-slate-300 term-font">(Untung Bersih ÷ Ekuiti) × 100%</p>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                    <p class="font-bold text-blue-400">Hutang atas Aset:</p>
+                    <p class="text-slate-300 term-font">(Jumlah Hutang ÷ Jumlah Aset) × 100%</p>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                    <p class="font-bold text-blue-400">Pusing Ganti Inventori:</p>
+                    <p class="text-slate-300 term-font">Jualan ÷ Inventori</p>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                    <p class="font-bold text-blue-400">EPS (Earnings Per Share):</p>
+                    <p class="text-slate-300 term-font">Untung Bersih ÷ Bilangan Saham</p>
+                </div>
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                    <p class="font-bold text-blue-400">Nisbah P/E:</p>
+                    <p class="text-slate-300 term-font">Harga Saham ÷ EPS</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="scratchpad-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center p-3">
+        <div class="glass-panel w-full max-w-lg rounded-2xl p-4 border border-slate-700 space-y-3 relative">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <div class="flex items-center gap-2 text-purple-400 font-bold text-sm">
+                    <i class="fa-solid fa-pen-to-square"></i> Pad Lakar Pengiraan (Scratchpad)
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="clearScratchpad()" class="px-2 py-1 bg-red-900/60 hover:bg-red-800 text-red-200 text-xs font-bold rounded">
+                        <i class="fa-solid fa-trash mr-1"></i> Padam
+                    </button>
+                    <button onclick="toggleScratchpadModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+            </div>
+
+            <p class="text-[11px] text-slate-400">Lakar corak pengiraan anda di bawah menggunakan tetikus atau skrin sentuh:</p>
+            <canvas id="scratchpad-canvas" class="w-full h-64 bg-slate-950 rounded-xl border border-slate-800 cursor-crosshair"></canvas>
+        </div>
+    </div>
+
+    <div id="review-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-3">
+        <div class="glass-panel w-full max-w-3xl h-[85vh] rounded-2xl p-4 border border-slate-700 flex flex-col relative">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2 mb-3">
+                <div class="flex items-center gap-2 text-indigo-400 font-bold text-sm sm:text-base">
+                    <i class="fa-solid fa-book-open"></i> Semakan Soalan & Jawapan (20 Nisbah)
+                </div>
+                <button onclick="toggleReviewModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <div id="review-list-container" class="flex-grow overflow-y-auto space-y-3 pr-2">
+                <!-- Populated dynamically with all 20 questions and correct answers -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playBeep(freq, type, duration, vol = 0.1) {
+            if (isMuted) return;
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch(e) {}
+        }
+
+        function playClickSound() { playBeep(600, 'sine', 0.08, 0.05); }
+        function playCorrectSound() { 
+            playBeep(523.25, 'sine', 0.1, 0.1); 
+            setTimeout(() => playBeep(659.25, 'sine', 0.15, 0.1), 80);
+            setTimeout(() => playBeep(783.99, 'sine', 0.25, 0.1), 160);
+        }
+        function playWrongSound() { 
+            playBeep(200, 'sawtooth', 0.2, 0.15); 
+            setTimeout(() => playBeep(150, 'sawtooth', 0.3, 0.15), 150);
+        }
+        function playUnlockSound() {
+            playBeep(440, 'triangle', 0.12, 0.1);
+            setTimeout(() => playBeep(880, 'triangle', 0.2, 0.1), 100);
+        }
+
+        function toggleAudio() {
+            isMuted = !isMuted;
+            const icon = document.getElementById('audio-icon');
+            if (isMuted) {
+                icon.className = 'fa-solid fa-volume-xmark text-red-400';
+            } else {
+                icon.className = 'fa-solid fa-volume-high text-emerald-400';
+                playClickSound();
+            }
+        }
+
+        const QUESTIONS = [
+            // BAHAGIAN A: TEORI (1-10)
+            {
+                id: 1,
+                category: "Bahagian A: Teori",
+                title: "Tujuan Nisbah Kecairan",
+                q: "1. Apakah tujuan utama Nisbah Semasa dan Nisbah Cepat dalam analisis kewangan?",
+                hint: "Nisbah kecairan memfokuskan kepada keupayaan menjelaskan hutang tempoh singkat.",
+                options: [
+                    { text: "Mengukur keupayaan firma membayar liabiliti jangka pendek", correct: true },
+                    { text: "Mengukur pulangan ekuiti pemegang saham", correct: false },
+                    { text: "Mengukur peratusan jualan yang bertukar menjadi untung bersih", correct: false },
+                    { text: "Mengukur jumlah aset jangka panjang yang dibeli", correct: false }
+                ]
+            },
+            {
+                id: 2,
+                category: "Bahagian A: Teori",
+                title: "Rumus Nisbah Cepat/Segera",
+                q: "2. Mengapakah inventori ditolak daripada Aset Semasa dalam pengiraan Nisbah Cepat?",
+                hint: "Inventori merupakan aset semasa yang memerlukan masa paling lama untuk ditukar menjadi tunai.",
+                options: [
+                    { text: "Kerana inventori merupakan aset semasa yang paling kurang cair", correct: true },
+                    { text: "Kerana inventori dikategorikan sebagai liabiliti semasa", correct: false },
+                    { text: "Kerana inventori tidak mempunyai sebarang nilai pasaran", correct: false },
+                    { text: "Kerana inventori tergolong dalam modal ekuiti pemilik", correct: false }
+                ]
+            },
+            {
+                id: 3,
+                category: "Bahagian A: Teori",
+                title: "Kegunaan Margin Untung Bersih",
+                q: "3. Margin Untung Bersih digunakan khas untuk mengukur:",
+                hint: "Membandingkan jumlah untung bersih yang diperoleh daripada setiap RM1 jualan.",
+                options: [
+                    { text: "Keuntungan bersih yang dijana bagi setiap ringgit jualan", correct: true },
+                    { text: "Kecekapan pengutipan akaun belum terima", correct: false },
+                    { text: "Nisbah hutang berbanding jumlah aset syarikat", correct: false },
+                    { text: "Tempoh simpanan inventori dalam gudang", correct: false }
+                ]
+            },
+            {
+                id: 4,
+                category: "Bahagian A: Teori",
+                title: "Maksud Pulangan atas Ekuiti (ROE)",
+                q: "4. Apakah yang diukur oleh Pulangan atas Ekuiti (ROE)?",
+                hint: "Menunjukkan sejauh mana syarikat menjana untung daripada pelaburan modal pemilik.",
+                options: [
+                    { text: "Pulangan yang diperoleh pemilik bagi setiap ringgit yang dilaburkan", correct: true },
+                    { text: "Kecekapan pengurusan menggunakan aset perniagaan", correct: false },
+                    { text: "Keupayaan perniagaan membayar dividen sesaham", correct: false },
+                    { text: "Nisbah liabiliti semasa berbanding modal kerja", correct: false }
+                ]
+            },
+            {
+                id: 5,
+                category: "Bahagian A: Teori",
+                title: "Rumus Hutang atas Aset",
+                q: "5. Manakah antara berikut merupakan rumus bagi Nisbah Hutang atas Aset?",
+                hint: "Membahagikan Jumlah Hutang dengan Jumlah Aset keseluruhan.",
+                options: [
+                    { text: "(Jumlah Hutang ÷ Jumlah Aset) × 100", correct: true },
+                    { text: "(Jumlah Hutang ÷ Ekuiti Pemilik) × 100", correct: false },
+                    { text: "(Untung Bersih ÷ Jumlah Aset) × 100", correct: false },
+                    { text: "(Aset Semasa ÷ Jumlah Hutang) × 100", correct: false }
+                ]
+            },
+            {
+                id: 6,
+                category: "Bahagian A: Teori",
+                title: "Maksud Pusing Ganti Inventori",
+                q: "6. Nisbah Pusing Ganti Inventori yang tinggi menunjukkan:",
+                hint: "Stok barang kerap dijual dan tidak terbiar lama di dalam gudang.",
+                options: [
+                    { text: "Pengurusan inventori yang cekap dan jualan yang pantas", correct: true },
+                    { text: "Syarikat menyimpan terlalu banyak modal dalam gudang", correct: false },
+                    { text: "Syarikat mengalami kesukaran membayar hutang pembekal", correct: false },
+                    { text: "Harga barang jualan syarikat terlalu mahal", correct: false }
+                ]
+            },
+            {
+                id: 7,
+                category: "Bahagian A: Teori",
+                title: "Tempoh Purata Kutipan",
+                q: "7. Tempoh Purata Kutipan bertujuan untuk mengukur:",
+                hint: "Masa purata yang diambil untuk mengutip bayaran daripada pelanggan kredit.",
+                options: [
+                    { text: "Keupayaan firma mengutip hutang daripada pelanggan kredit", correct: true },
+                    { text: "Tempoh masa firma membayar hutang kepada pembekal", correct: false },
+                    { text: "Tempoh barang berada dalam simpanan gudang", correct: false },
+                    { text: "Kadar keuntungan sesaham syarikat", correct: false }
+                ]
+            },
+            {
+                id: 8,
+                category: "Bahagian A: Teori",
+                title: "Rumus Pendapatan Sesaham (EPS)",
+                q: "8. Apakah rumus bagi Pendapatan Sesaham (EPS)?",
+                hint: "Untung bersih dibahagikan dengan jumlah bilangan saham biasa.",
+                options: [
+                    { text: "Untung Bersih ÷ Bilangan Saham Biasa Diterbitkan", correct: true },
+                    { text: "Harga Saham Pasaran ÷ Pendapatan Sesaham", correct: false },
+                    { text: "Jumlah Ekuiti ÷ Bilangan Saham Biasa", correct: false },
+                    { text: "Untung Bersih ÷ Jumlah Aset", correct: false }
+                ]
+            },
+            {
+                id: 9,
+                category: "Bahagian A: Teori",
+                title: "Nisbah Harga/Pendapatan (P/E)",
+                q: "9. Nisbah P/E digunakan oleh pelabur terutamanya sebagai:",
+                hint: "Melihat sejauh mana pelabur meyakini prospek pertumbuhan syarikat.",
+                options: [
+                    { text: "Petunjuk prospek dan potensi pertumbuhan firma pada masa hadapan", correct: true },
+                    { text: "Ukuran kecekapan firma membayar pinjaman bank", correct: false },
+                    { text: "Ukuran kecairan kewangan harian perniagaan", correct: false },
+                    { text: "Penanda aras kadar dividen yang pasti dibayar", correct: false }
+                ]
+            },
+            {
+                id: 10,
+                category: "Bahagian A: Teori",
+                title: "Nilai Pasaran kepada Nilai Buku",
+                q: "10. Nisbah Nilai Pasaran kepada Nilai Buku menunjukkan:",
+                hint: "Nisbah penilaian harga saham di pasaran berbanding nilai perakaunan buku.",
+                options: [
+                    { text: "Kesanggupan pelabur membayar untuk seunit saham berdasarkan nilai buku firma", correct: true },
+                    { text: "Jumlah wang tunai sebenar yang ada di dalam bank syarikat", correct: false },
+                    { text: "Kadar faedah pinjaman bank yang perlu dibayar", correct: false },
+                    { text: "Jumlah aset tetap yang dimiliki oleh syarikat", correct: false }
+                ]
+            },
+
+            // BAHAGIAN B: PENGIRAAN (11-20)
+            {
+                id: 11,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Nisbah Semasa",
+                q: "11. Syarikat Mutiara Bhd mempunyai Aset Semasa bernilai RM150,000 dan Liabiliti Semasa bernilai RM50,000. Berapakah Nisbah Semasa syarikat?",
+                hint: "Formula: RM150,000 ÷ RM50,000",
+                options: [
+                    { text: "3.0 kali", correct: true },
+                    { text: "0.33 kali", correct: false },
+                    { text: "2.0 kali", correct: false },
+                    { text: "4.0 kali", correct: false }
+                ]
+            },
+            {
+                id: 12,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Nisbah Cepat",
+                q: "12. Perniagaan Teguh mempunyai Aset Semasa RM200,000, Inventori RM50,000, dan Liabiliti Semasa RM75,000. Berapakah Nisbah Cepat?",
+                hint: "Formula: (RM200,000 - RM50,000) ÷ RM75,000 = RM150,000 ÷ RM75,000",
+                options: [
+                    { text: "2.0 kali", correct: true },
+                    { text: "2.67 kali", correct: false },
+                    { text: "1.5 kali", correct: false },
+                    { text: "3.0 kali", correct: false }
+                ]
+            },
+            {
+                id: 13,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Margin Untung Bersih",
+                q: "13. Syarikat Suria mencatatkan Jualan Bersih RM500,000 dan Untung Bersih RM75,000. Berapakah Margin Untung Bersih syarikat ini?",
+                hint: "Formula: (RM75,000 ÷ RM500,000) × 100",
+                options: [
+                    { text: "15%", correct: true },
+                    { text: "20%", correct: false },
+                    { text: "10%", correct: false },
+                    { text: "25%", correct: false }
+                ]
+            },
+            {
+                id: 14,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Pulangan atas Ekuiti (ROE)",
+                q: "14. Syarikat Gemilang mendapat Untung Bersih RM60,000 manakala Jumlah Ekuiti Pemilik ialah RM300,000. Berapakah nilai ROE?",
+                hint: "Formula: (RM60,000 ÷ RM300,000) × 100",
+                options: [
+                    { text: "20%", correct: true },
+                    { text: "15%", correct: false },
+                    { text: "25%", correct: false },
+                    { text: "18%", correct: false }
+                ]
+            },
+            {
+                id: 15,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Hutang atas Aset",
+                q: "15. Jika Jumlah Hutang Syarikat Bestari ialah RM120,000 dan Jumlah Aset ialah RM400,000, berapakah Nisbah Hutang atas Aset?",
+                hint: "Formula: (RM120,000 ÷ RM400,000) × 100",
+                options: [
+                    { text: "30%", correct: true },
+                    { text: "33.3%", correct: false },
+                    { text: "25%", correct: false },
+                    { text: "40%", correct: false }
+                ]
+            },
+            {
+                id: 16,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Pusing Ganti Inventori",
+                q: "16. Syarikat Wawasan mencatatkan Jualan RM600,000 dan purata Inventori RM100,000. Berapakah Pusing Ganti Inventori?",
+                hint: "Formula: RM600,000 ÷ RM100,000",
+                options: [
+                    { text: "6 kali", correct: true },
+                    { text: "5 kali", correct: false },
+                    { text: "8 kali", correct: false },
+                    { text: "4 kali", correct: false }
+                ]
+            },
+            {
+                id: 17,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Tempoh Purata Kutipan",
+                q: "17. Akaun Belum Terima Syarikat Jaya ialah RM40,000. Jika Jualan Kredit Sehari ialah RM1,000, berapa harikah Tempoh Purata Kutipan?",
+                hint: "Formula: RM40,000 ÷ RM1,000",
+                options: [
+                    { text: "40 hari", correct: true },
+                    { text: "30 hari", correct: false },
+                    { text: "25 hari", correct: false },
+                    { text: "50 hari", correct: false }
+                ]
+            },
+            {
+                id: 18,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan EPS",
+                q: "18. Syarikat Bina Bhd memperolehi Untung Bersih RM250,000 dengan 500,000 unit Saham Biasa diterbitkan. Berapakah Pendapatan Sesaham (EPS)?",
+                hint: "Formula: RM250,000 ÷ 500,000 unit",
+                options: [
+                    { text: "RM0.50 sesaham", correct: true },
+                    { text: "RM2.00 sesaham", correct: false },
+                    { text: "RM1.00 sesaham", correct: false },
+                    { text: "RM0.25 sesaham", correct: false }
+                ]
+            },
+            {
+                id: 19,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Nisbah P/E",
+                q: "19. Harga pasaran seunit saham Syarikat Megah ialah RM6.00 dan Pendapatan Sesaham (EPS) ialah RM0.50. Berapakah Nisbah P/E syarikat?",
+                hint: "Formula: RM6.00 ÷ RM0.50",
+                options: [
+                    { text: "12 kali", correct: true },
+                    { text: "3 kali", correct: false },
+                    { text: "10 kali", correct: false },
+                    { text: "15 kali", correct: false }
+                ]
+            },
+            {
+                id: 20,
+                category: "Bahagian B: Pengiraan",
+                title: "Pengiraan Pulangan atas Aset (ROA)",
+                q: "20. Syarikat Alfa mencatatkan Untung Bersih RM80,000 dan Jumlah Aset RM800,000. Berapakah Pulangan atas Aset (ROA) syarikat?",
+                hint: "Formula: (RM80,000 ÷ RM800,000) × 100",
+                options: [
+                    { text: "10%", correct: true },
+                    { text: "12%", correct: false },
+                    { text: "8%", correct: false },
+                    { text: "15%", correct: false }
+                ]
+            }
+        ];
+
+        const MODES = {
+            troopers: { name: "Troopers", time: 1200, penalty: 5 },
+            rascals:  { name: "Rascals", time: 720, penalty: 15 },
+            tricksters:{ name: "Tricksters", time: 420, penalty: 30 }
+        };
+
+        let selectedModeKey = "rascals";
+        let playerName = "";
+        let currentLevel = 0;
+        const totalLevels = QUESTIONS.length;
+        let timeRemaining = 720;
+        let initialTime = 720;
+        let penaltyCount = 0;
+        let score = 0;
+        let streak = 0;
+        let timerInterval = null;
+        let gameActive = false;
+
+        // Powerups count
+        let powerup5050Count = 1;
+        let powerupFreezeCount = 1;
+
+        // DOM elements
+        const timerDisplay = document.getElementById('timer-display');
+        const levelDisplay = document.getElementById('level-display');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const msgIcon = document.getElementById('msg-icon');
+        const progressDotsContainer = document.getElementById('progress-dots');
+
+        function initDots() {
+            progressDotsContainer.innerHTML = '';
+            for (let i = 1; i <= totalLevels; i++) {
+                const dot = document.createElement('div');
+                dot.id = `dot-${i}`;
+                dot.className = "w-2 h-2 rounded-full bg-slate-700 transition-all";
+                progressDotsContainer.appendChild(dot);
+            }
+        }
+        initDots();
+
+        function selectMode(modeKey) {
+            playClickSound();
+            selectedModeKey = modeKey;
+            document.querySelectorAll('.mode-card').forEach(card => card.classList.remove('selected'));
+            document.getElementById(`card-${modeKey}`).classList.add('selected');
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function startGame() {
+            playClickSound();
+            const nameInput = document.getElementById('player-name-input').value.trim();
+            if (!nameInput) {
+                showMessage("Sila masukkan nama ejen anda!", true);
+                document.getElementById('player-name-input').focus();
+                return;
+            }
+
+            playerName = nameInput;
+            const config = MODES[selectedModeKey];
+            timeRemaining = config.time;
+            initialTime = config.time;
+            score = 0;
+            streak = 0;
+
+            document.getElementById('hud-player-name').textContent = playerName;
+            document.getElementById('player-tag').classList.remove('hidden');
+            document.getElementById('progress-dots').classList.remove('hidden');
+
+            document.getElementById('room-0').classList.add('hidden');
+            gameActive = true;
+            currentLevel = 1;
+            
+            showRoom(1);
+            timerInterval = setInterval(updateTimer, 1000);
+            updateProgress();
+        }
+
+        function updateTimer() {
+            if (!gameActive) return;
+            timeRemaining--;
+            timerDisplay.textContent = formatTime(timeRemaining);
+
+            if (timeRemaining <= 60) {
+                timerDisplay.classList.add('text-red-500', 'animate-pulse');
+            }
+
+            if (timeRemaining <= 0) {
+                gameOver();
+            }
+        }
+
+        function showMessage(msg, isError = true) {
+            messageText.textContent = msg;
+            msgIcon.className = `fa-solid ${isError ? 'fa-triangle-exclamation text-red-400' : 'fa-circle-check text-emerald-400'}`;
+            
+            messageBox.className = `absolute top-16 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-xl border transition-all duration-300 z-50 flex items-center gap-2 text-xs sm:text-sm font-bold ${
+                isError ? 'bg-red-950/90 text-red-200 border-red-500/80' : 'bg-emerald-950/90 text-emerald-200 border-emerald-500/80'
+            }`;
+
+            messageBox.classList.remove('opacity-0');
+
+            if (isError && gameActive) {
+                playWrongSound();
+                const container = document.getElementById('game-container');
+                container.classList.add('shake');
+                setTimeout(() => container.classList.remove('shake'), 500);
+
+                const penalty = MODES[selectedModeKey].penalty;
+                penaltyCount++;
+                timeRemaining = Math.max(1, timeRemaining - penalty);
+                timerDisplay.textContent = formatTime(timeRemaining);
+            }
+
+            setTimeout(() => {
+                messageBox.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        function showRoom(levelNum) {
+            const roomData = QUESTIONS[levelNum - 1];
+
+            const activeContainer = document.getElementById('active-room-container');
+            activeContainer.classList.remove('hidden');
+            activeContainer.classList.add('glitch-anim');
+            setTimeout(() => activeContainer.classList.remove('glitch-anim'), 350);
+
+            document.getElementById('room-category-badge').textContent = roomData.category;
+            document.getElementById('room-header-title').textContent = roomData.title;
+            document.getElementById('room-question-text').textContent = roomData.q;
+            document.getElementById('room-hint-text').textContent = roomData.hint;
+
+            // Render Options
+            const optionsContainer = document.getElementById('room-options-container');
+            optionsContainer.innerHTML = '';
+
+            const shuffledOptions = [...roomData.options];
+            for (let i = shuffledOptions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+            }
+
+            const prefixLetters = ['A', 'B', 'C', 'D'];
+
+            shuffledOptions.forEach((opt, index) => {
+                const cleanText = opt.text.replace(/^[A-D]\.\s*/, '');
+                const optionLetter = prefixLetters[index] || '';
+
+                const btn = document.createElement('button');
+                btn.className = 'option-btn w-full text-left p-3 bg-slate-800 hover:bg-slate-700/80 border border-slate-600/80 rounded-lg text-xs sm:text-sm transition-all flex items-center justify-between font-medium text-slate-200';
+                btn.innerHTML = `<span><strong class="text-blue-400 mr-2">${optionLetter}.</strong>${cleanText}</span> <i class="fa-solid fa-key text-slate-500 opacity-40"></i>`;
+                btn.onclick = () => selectOption(opt.correct, btn);
+                optionsContainer.appendChild(btn);
+            });
+
+            levelDisplay.textContent = `${levelNum}/${totalLevels}`;
+        }
+
+        function selectOption(isCorrect, buttonEl) {
+            if (isCorrect) {
+                playCorrectSound();
+                buttonEl.classList.remove('bg-slate-800', 'border-slate-600/80');
+                buttonEl.classList.add('bg-emerald-800/80', 'border-emerald-400', 'text-white');
+                
+                streak++;
+                score += 100 + (streak * 20);
+                updateStreakDisplay();
+                showMessage("Akses Dibenarkan!", false);
+                
+                document.querySelectorAll('#room-options-container button').forEach(b => b.disabled = true);
+                setTimeout(advanceLevel, 600);
+            } else {
+                buttonEl.classList.remove('bg-slate-800');
+                buttonEl.classList.add('bg-red-900/60', 'border-red-500');
+                buttonEl.disabled = true;
+                streak = 0;
+                updateStreakDisplay();
+                showMessage(`Salah! Penalti Masa: -${MODES[selectedModeKey].penalty}s`, true);
+            }
+        }
+
+        function updateStreakDisplay() {
+            const streakBadge = document.getElementById('streak-badge');
+            const streakCount = document.getElementById('streak-count');
+            if (streak > 1) {
+                streakCount.textContent = streak;
+                streakBadge.classList.remove('hidden');
+                streakBadge.classList.add('flex');
+            } else {
+                streakBadge.classList.add('hidden');
+                streakBadge.classList.remove('flex');
+            }
+        }
+
+        function advanceLevel() {
+            playUnlockSound();
+            
+            // Rotate Vault Dial Icon
+            const dial = document.getElementById('vault-dial-icon');
+            dial.classList.add('gear-rotate');
+            setTimeout(() => dial.classList.remove('gear-rotate'), 1200);
+
+            currentLevel++;
+            if (currentLevel > totalLevels) {
+                gameWin();
+            } else {
+                showRoom(currentLevel);
+                updateProgress();
+            }
+        }
+
+        function updateProgress() {
+            for (let i = 1; i <= totalLevels; i++) {
+                const dot = document.getElementById(`dot-${i}`);
+                if (i < currentLevel) {
+                    dot.className = "w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]";
+                } else if (i === currentLevel) {
+                    dot.className = "w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_6px_#3b82f6] animate-pulse";
+                } else {
+                    dot.className = "w-2 h-2 rounded-full bg-slate-700";
+                }
+            }
+        }
+
+        function usePowerup(type) {
+            playClickSound();
+            if (type === '5050') {
+                if (powerup5050Count <= 0) return;
+                powerup5050Count--;
+                document.getElementById('count-5050').textContent = powerup5050Count;
+                if (powerup5050Count === 0) document.getElementById('powerup-5050').classList.add('opacity-40', 'pointer-events-none');
+
+                // Eliminate 2 wrong options
+                const roomData = QUESTIONS[currentLevel - 1];
+                const optionBtns = Array.from(document.querySelectorAll('#room-options-container button'));
+                let eliminated = 0;
+                optionBtns.forEach(btn => {
+                    const text = btn.textContent;
+                    const isCorrectOpt = roomData.options.some(o => o.correct && text.includes(o.text.replace(/^[A-D]\.\s*/, '')));
+                    if (!isCorrectOpt && eliminated < 2 && !btn.disabled) {
+                        btn.disabled = true;
+                        btn.classList.add('opacity-30', 'line-through');
+                        eliminated++;
+                    }
+                });
+                showMessage("50:50 Digunakan! 2 Jawapan Salah Dibatalkan.", false);
+            } else if (type === 'freeze') {
+                if (powerupFreezeCount <= 0) return;
+                powerupFreezeCount--;
+                document.getElementById('count-freeze').textContent = powerupFreezeCount;
+                if (powerupFreezeCount === 0) document.getElementById('powerup-freeze').classList.add('opacity-40', 'pointer-events-none');
+
+                timeRemaining += 15;
+                timerDisplay.textContent = formatTime(timeRemaining);
+                showMessage("Masa Dibekukan! +15 Saat Ditambah.", false);
+            }
+        }
+
+        function gameWin() {
+            clearInterval(timerInterval);
+            gameActive = false;
+            document.getElementById('active-room-container').classList.add('hidden');
+
+            const timeSpent = initialTime - timeRemaining;
+            let grade = 'S';
+            if (penaltyCount > 5) grade = 'C';
+            else if (penaltyCount > 3) grade = 'B';
+            else if (penaltyCount > 1) grade = 'A';
+
+            document.getElementById('res-player-name').textContent = playerName;
+            document.getElementById('res-grade').textContent = grade;
+            document.getElementById('res-score').textContent = score;
+            document.getElementById('res-time-taken').textContent = formatTime(timeSpent);
+            document.getElementById('res-penalties').textContent = `${penaltyCount} kali`;
+
+            document.getElementById('room-success').classList.remove('hidden');
+            renderReviewList();
+        }
+
+        function gameOver() {
+            clearInterval(timerInterval);
+            gameActive = false;
+            document.getElementById('active-room-container').classList.add('hidden');
+            document.getElementById('fail-player-name').textContent = playerName;
+            document.getElementById('room-fail').classList.remove('hidden');
+            renderReviewList();
+        }
+
+        function toggleCalculatorModal() {
+            playClickSound();
+            const modal = document.getElementById('calc-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function switchCalcTab(tab) {
+            playClickSound();
+            if (tab === 'calc') {
+                document.getElementById('tab-calc-content').classList.remove('hidden');
+                document.getElementById('tab-formulas-content').classList.add('hidden');
+                document.getElementById('btn-tab-calc').className = 'flex-1 py-1.5 text-center text-blue-400 border-b-2 border-blue-400 font-bold';
+                document.getElementById('btn-tab-formulas').className = 'flex-1 py-1.5 text-center text-slate-400 border-b-2 border-transparent font-bold';
+            } else {
+                document.getElementById('tab-calc-content').classList.add('hidden');
+                document.getElementById('tab-formulas-content').classList.remove('hidden');
+                document.getElementById('btn-tab-calc').className = 'flex-1 py-1.5 text-center text-slate-400 border-b-2 border-transparent font-bold';
+                document.getElementById('btn-tab-formulas').className = 'flex-1 py-1.5 text-center text-blue-400 border-b-2 border-blue-400 font-bold';
+            }
+        }
+
+        let calcVal = "0";
+        function calcPress(val) {
+            playClickSound();
+            if (calcVal === "0" && val !== ".") calcVal = "";
+            calcVal += val;
+            document.getElementById('calc-display').value = calcVal;
+        }
+
+        function calcClear() {
+            playClickSound();
+            calcVal = "0";
+            document.getElementById('calc-display').value = calcVal;
+        }
+
+        function calcBackspace() {
+            playClickSound();
+            calcVal = calcVal.slice(0, -1);
+            if (calcVal === "") calcVal = "0";
+            document.getElementById('calc-display').value = calcVal;
+        }
+
+        function calcEqual() {
+            playClickSound();
+            try {
+                calcVal = eval(calcVal).toString();
+                document.getElementById('calc-display').value = calcVal;
+            } catch(e) {
+                document.getElementById('calc-display').value = "Error";
+                calcVal = "0";
+            }
+        }
+
+        function toggleScratchpadModal() {
+            playClickSound();
+            const modal = document.getElementById('scratchpad-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                initScratchpad();
+            }
+        }
+
+        let isDrawing = false;
+        let padCtx = null;
+
+        function initScratchpad() {
+            const canvas = document.getElementById('scratchpad-canvas');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            padCtx = canvas.getContext('2d');
+            padCtx.strokeStyle = '#c084fc';
+            padCtx.lineWidth = 3;
+            padCtx.lineCap = 'round';
+
+            canvas.onmousedown = (e) => { isDrawing = true; padCtx.beginPath(); padCtx.moveTo(e.offsetX, e.offsetY); };
+            canvas.onmousemove = (e) => { if (isDrawing) { padCtx.lineTo(e.offsetX, e.offsetY); padCtx.stroke(); } };
+            canvas.onmouseup = () => { isDrawing = false; };
+
+            // Touch support for mobile
+            canvas.ontouchstart = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                isDrawing = true;
+                padCtx.beginPath();
+                padCtx.moveTo(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top);
+            };
+            canvas.ontouchmove = (e) => {
+                if (isDrawing) {
+                    const rect = canvas.getBoundingClientRect();
+                    padCtx.lineTo(e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top);
+                    padCtx.stroke();
+                }
+            };
+            canvas.ontouchend = () => { isDrawing = false; };
+        }
+
+        function clearScratchpad() {
+            playClickSound();
+            const canvas = document.getElementById('scratchpad-canvas');
+            if (padCtx) padCtx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function toggleReviewModal() {
+            playClickSound();
+            document.getElementById('review-modal').classList.toggle('hidden');
+        }
+
+        function renderReviewList() {
+            const container = document.getElementById('review-list-container');
+            container.innerHTML = '';
+
+            QUESTIONS.forEach((q, idx) => {
+                const correctOpt = q.options.find(o => o.correct);
+                const card = document.createElement('div');
+                card.className = "bg-slate-900/90 p-3 rounded-xl border border-slate-700 space-y-1";
+                card.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-blue-400 uppercase">${q.category}</span>
+                        <span class="text-[10px] text-slate-400 font-mono">Soalan ${idx + 1}/20</span>
+                    </div>
+                    <p class="text-xs font-semibold text-white">${q.q}</p>
+                    <p class="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-check-circle"></i> Jawapan Tepat: ${correctOpt.text}
+                    </p>
+                    <p class="text-[11px] text-slate-400 bg-slate-950/60 p-2 rounded border border-slate-800 term-font">
+                        💡 ${q.hint}
+                    </p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        window.onload = function() {
+            const canvas = document.getElementById('bg-particles-canvas');
+            const ctx = canvas.getContext('2d');
+            let particles = [];
+
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+            window.onresize = resizeCanvas;
+
+            for (let i = 0; i < 35; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 2 + 1,
+                    vx: (Math.random() - 0.5) * 0.4,
+                    vy: (Math.random() - 0.5) * 0.4,
+                    alpha: Math.random() * 0.5 + 0.2
+                });
+            }
+
+            function animateBg() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    if (p.x < 0) p.x = canvas.width;
+                    if (p.x > canvas.width) p.x = 0;
+                    if (p.y < 0) p.y = canvas.height;
+                    if (p.y > canvas.height) p.y = 0;
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(56, 189, 248, ${p.alpha})`;
+                    ctx.fill();
+                });
+                requestAnimationFrame(animateBg);
+            }
+            animateBg();
+        };
+    </script>
+</body>
+</html>
